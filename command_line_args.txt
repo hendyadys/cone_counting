@@ -1,0 +1,2 @@
+"-p" "../overview/1-process-data/final/valid2" "--network" "vgg"
+"-p" "../VOCdevkit/VOC2012/JPEGImages" "--network" "vgg"
