@@ -59,14 +59,15 @@ def plot_cone_preds(file_name, img, coords, flipAxis=False, is_all=False):
     fig1, ax1 = plt.subplots(1)
     ax1.imshow(img)
     for coord in coords:
-        (real_x1, real_y1, real_x2, real_y2) = coord
-        if flipAxis: # imshow flips coords
-            ax1.add_patch(
-                patches.Rectangle((real_y1, real_x1), real_y2 - real_y1, real_x2 - real_x1, fill=False, color='green'))
+        (x1, y1, x2, y2) = coord
+        if flipAxis:  # imshow flips coords
+            ax1.add_patch(patches.Rectangle((y1, x1), y2 - y1, x2 - x1, fill=False, color='green'))
         else:
-            ax1.add_patch(
-                patches.Rectangle((real_x1, real_y1), real_x2 - real_x1, real_y2 - real_y1, fill=False, color='green'))
-    img_name = '{}_{}.png'.format(file_name.split('.png')[0], 'all' if is_all else '')
+            ax1.add_patch(patches.Rectangle((x1, y1), x2 - x1, y2 - y1, fill=False, color='green'))
+    pred_path = img_path.split('/')[:-1]
+    pred_path.append('predicted')
+    pred_path = '/'.join(pred_path)
+    img_name = '{}/{}{}.png'.format(pred_path, file_name.split('.png')[0], '_all' if is_all else '')
     plt.savefig(img_name, bbox_inches='tight')
 
     # plot points on img
@@ -82,7 +83,7 @@ def plot_cone_preds(file_name, img, coords, flipAxis=False, is_all=False):
         plt.scatter(x=coord_centers_y, y=coord_centers_x, c='blue', s=10)   # imshow flips coords
     else:
         plt.scatter(x=coord_centers_x, y=coord_centers_y, c='blue', s=10)
-    img_name = '{}_{}centers.png'.format(file_name.split('.png')[0], 'all' if is_all else '')
+    img_name = '{}/{}{}_centers.png'.format(pred_path, file_name.split('.png')[0], '_all' if is_all else '')
     plt.savefig(img_name, bbox_inches='tight')
     # plt.show()
     return
@@ -231,6 +232,7 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
     filepath = os.path.join(img_path, img_name)
 
     img = cv2.imread(filepath)
+    print(img.shape)
 
     X, ratio = format_img(img, C)
     with open(debug_file, 'a') as fout:
@@ -281,7 +283,7 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
             fout.write('P_regr.shape={}\n P_regr={}\n'.format(P_regr.shape, P_regr))
 
         for ii in range(P_cls.shape[1]):
-            print(np.max(P_cls[0, ii, :]), np.argmax(P_cls[0, ii, :]) == (P_cls.shape[2] - 1))
+            # print(np.max(P_cls[0, ii, :]), np.argmax(P_cls[0, ii, :]) == (P_cls.shape[2] - 1))
 
             if np.max(P_cls[0, ii, :]) < bbox_threshold or np.argmax(P_cls[0, ii, :]) == (P_cls.shape[2] - 1):
                 continue
@@ -315,6 +317,7 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
 
     all_dets = []
 
+    print(len(bboxes))
     for key in bboxes:
         bbox = np.array(bboxes[key])
 
@@ -363,6 +366,14 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
                 fout.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(img_name, num_coords_true, num_preds,
                                                              np.sum(euclidean_loss)/float(num_coords_true),
                                                              num_preds_all, np.sum(euclidean_loss_all)/float(num_coords_true)))
+        if 'pepple' in img_path:
+            # visualize all_coords and thresholded coords
+            # plot_cone_preds(img_name, img, supp_coords, flipAxis=False, is_all=False)
+            with open(coords_file, 'a') as fout:
+                fout.write('{}\t{}\n'.format(img_name, supp_coords))
+            with open(all_coords_file, 'a') as fout:
+                fout.write('{}\t{}\n'.format(img_name, all_coords))
+
 
     print('Elapsed time = {}'.format(time.time() - st))
     print(all_dets)
