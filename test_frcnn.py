@@ -11,6 +11,8 @@ from keras import backend as K
 from keras.layers import Input
 from keras.models import Model
 from keras_frcnn import roi_helpers
+import matplotlib.pyplot as plt
+plt.switch_backend('agg')
 
 sys.setrecursionlimit(40000)
 
@@ -373,13 +375,17 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
                 fout.write('{}\t{}\n'.format(img_name, supp_coords))
             with open(all_coords_file, 'a') as fout:
                 fout.write('{}\t{}\n'.format(img_name, all_coords))
+            # plt.imshow(img)
+            # plt.savefig('./results_imgs2/{}.png'.format(img_name), bbox_inches='tight')
+            # cv2.waitKey(0)
+            # cv2.imwrite('./results_imgs2/{}.png'.format(img_name), img)
 
 
     print('Elapsed time = {}'.format(time.time() - st))
     print(all_dets)
     # cv2.imshow('img', img)
     # cv2.waitKey(0)
-    cv2.imwrite('./results_imgs/{}.png'.format(idx),img)
+    # cv2.imwrite('./results_imgs/{}.png'.format(idx),img)
 
 
 # command line arguments
