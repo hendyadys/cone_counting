@@ -99,9 +99,9 @@ def visualize_cone_data(file_name, coords):
     plot_boxes_cv(img, coords)
     centers = compute_centers(coords)
     plot_centers_np(img2, centers)
-    plot_centers_np(img2, centers, flipAxis=True)
+    # plot_centers_np(img2, centers, flipAxis=True)
     plot_boxes_np(img2, coords)
-    plot_boxes_np(img2, coords, flipAxis=True)
+    # plot_boxes_np(img2, coords, flipAxis=True)
 
     # # check mask for coords
     # mask = load_mask(file_name)

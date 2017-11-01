@@ -10,10 +10,10 @@ def get_data(input_path):
 
 	class_mapping = {}
 
-	visualise = True
+	visualise = False
 	
 	with open(input_path,'r') as f:
-		os.chdir('../overview/1-process-data')
+		# os.chdir('../overview/1-process-data')
 
 		print('Parsing annotation files')
 

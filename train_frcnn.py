@@ -64,6 +64,7 @@ C.use_vertical_flips = bool(options.vertical_flips)
 C.rot_90 = bool(options.rot_90)
 
 C.model_path = options.output_weight_path
+print('output_weight_path:', C.model_path)
 C.num_rois = int(options.num_rois)
 
 if options.network == 'vgg':
@@ -138,7 +139,7 @@ shared_layers = nn.nn_base(img_input, trainable=True)
 
 # define the RPN, built on the base layers
 num_anchors = len(C.anchor_box_scales) * len(C.anchor_box_ratios)
-print('num_samples=%d' % num_anchors)
+print('num_anchors=%d' % num_anchors)
 rpn = nn.rpn(shared_layers, num_anchors)
 
 classifier = nn.classifier(shared_layers, roi_input, C.num_rois, nb_classes=len(classes_count), trainable=True)
@@ -317,6 +318,6 @@ print('Training complete, exiting.')
 
 # command line arguments
 # "-p" "../overview/1-process-data/final/valid" "--network" "vgg"
-# "-p" "../VOCdevkit/VOC2012/JPEGImages" "--network" "vgg"
+# "-p" "../VOCdevkit" "--network" "vgg"
 # "-o" "simple" "-p" "../overview/1-process-data/cone_data_valid.txt" "--network" "vgg"
 # "-p" "../VOCdevkit" "--network" "vgg"

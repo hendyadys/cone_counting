@@ -28,6 +28,10 @@ parser.add_option("--network", dest="network", help="Base network to use. Suppor
                   default='resnet50')
 # parser.add_option("--network", dest="network", help="Base network to use. Supports vgg or resnet50.",
 #                   default='vgg')
+parser.add_option("--scale", dest="scale", default='original',
+                  help="original anchor box scales or better scales.")
+# parser.add_option("--input_weight_path", dest="input_weight_path",
+#                   help="Input path for trained weights. If not specified, will try to load default weights in config.")
 
 (options, args) = parser.parse_args()
 
@@ -35,9 +39,24 @@ if not options.test_path:  # if filename is not given
     parser.error('Error: path to test data must be specified. Pass --path to command line')
 
 config_output_filename = options.config_filename
+# HACK to get naming conventions correct
+config_output_filename = 'config{}.pickle'.format('' if options.scale=='original' else '_noisy')
+print('config_output_filename:', config_output_filename)
 
 with open(config_output_filename, 'rb') as f_in:
     C = pickle.load(f_in)
+
+model_path = C.model_path
+# if options.scale=='original':
+#     model_path = model_path
+# else:  # set the path to weights based on backend and model
+#     model_path = '{}{}.hdf5'.format(model_path.split('.hdf5')[0], '' if options.scale=='original' else '_noisy')
+print('model_path:', model_path, 'anchor_box_scales:', C.anchor_box_scales)
+
+# with open('config.pickle', 'wb') as config_f:
+#     # C.anchor_box_scales = [128, 256, 512]
+#     pickle.dump(C, config_f)
+#     print('Config has been written to {}, and can be loaded when testing to ensure correct results'.format('config.pickle'))
 
 print('C.network=%s' % C.network)
 if C.network == 'resnet50':
@@ -203,24 +222,27 @@ model_classifier_only = Model([feature_map_input, roi_input], classifier)
 
 model_classifier = Model([feature_map_input, roi_input], classifier)
 
-print('Loading weights from {}'.format(C.model_path))
-model_rpn.load_weights(C.model_path, by_name=True)
-model_classifier.load_weights(C.model_path, by_name=True)
+# load weights from correct model_path
+try:
+    print('Loading weights from {}'.format(model_path))
+    model_rpn.load_weights(model_path, by_name=True)
+    model_classifier.load_weights(model_path, by_name=True)
+except:
+    print('Could not load pretrained weights. ', model_path)
 
 model_rpn.compile(optimizer='sgd', loss='mse')
 model_classifier.compile(optimizer='sgd', loss='mse')
 
 all_imgs = []
-
 classes = {}
-
 bbox_threshold = 0.8
 
-visualise = True
-debug_file = './debug.txt'
-all_coords_file = '%s/all_coords.txt' % img_path
-coords_file = '%s/coords.txt' % img_path
-loss_file =  '%s/losses.txt' % img_path
+# visualise = True
+# debug_file = './debug.txt'
+NOISIER = True if options.scale!='original' else False
+all_coords_file = '{}/all_coords{}.txt'.format(img_path, '_noisy' if NOISIER else '')
+coords_file = '{}/coords{}.txt'.format(img_path, '_noisy' if NOISIER else '')
+loss_file = '{}/losses{}.txt'.format(img_path, '_noisy' if NOISIER else '')
 
 for idx, img_name in enumerate(sorted(os.listdir(img_path))):
     # if idx > 0: break
@@ -237,22 +259,22 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
     print(img.shape)
 
     X, ratio = format_img(img, C)
-    with open(debug_file, 'a') as fout:
-        fout.write('ratio={} \n X.shape={}\n X={} \n'.format(ratio, X.shape, X))
+    # with open(debug_file, 'a') as fout:
+    #     fout.write('ratio={} \n X.shape={}\n X={} \n'.format(ratio, X.shape, X))
 
     if K.image_dim_ordering() == 'tf':
         X = np.transpose(X, (0, 2, 3, 1))
 
     # get the feature maps and output from the RPN
     [Y1, Y2, F] = model_rpn.predict(X)
-    with open(debug_file, 'a') as fout:
-        fout.write('Y1.shape={}\n Y1={} \n'.format(Y1.shape, Y1))
-        fout.write('Y2.shape={}\n Y2={} \n'.format(Y2.shape, Y2))
-        fout.write('F.shape={}\n F={} \n'.format(F.shape, F))
+    # with open(debug_file, 'a') as fout:
+    #     fout.write('Y1.shape={}\n Y1={} \n'.format(Y1.shape, Y1))
+    #     fout.write('Y2.shape={}\n Y2={} \n'.format(Y2.shape, Y2))
+    #     fout.write('F.shape={}\n F={} \n'.format(F.shape, F))
 
     R = roi_helpers.rpn_to_roi(Y1, Y2, C, K.image_dim_ordering(), overlap_thresh=0.7)
-    with open(debug_file, 'a') as fout:
-        fout.write('R.shape={}\n R={} \n'.format(R.shape, R))
+    # with open(debug_file, 'a') as fout:
+    #     fout.write('R.shape={}\n R={} \n'.format(R.shape, R))
 
     # convert from (x1,y1,x2,y2) to (x,y,w,h)
     R[:, 2] -= R[:, 0]
@@ -276,13 +298,13 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
             ROIs_padded[0, curr_shape[1]:, :] = ROIs[0, 0, :]
             ROIs = ROIs_padded
 
-        with open(debug_file, 'a') as fout:
-            fout.write('ROIs.shape={}\n ROIs={} \n'.format(ROIs.shape, ROIs))
+        # with open(debug_file, 'a') as fout:
+        #     fout.write('ROIs.shape={}\n ROIs={} \n'.format(ROIs.shape, ROIs))
 
         [P_cls, P_regr] = model_classifier_only.predict([F, ROIs])
-        with open(debug_file, 'a') as fout:
-            fout.write('P_cls.shape={}\n P_cls={}\n'.format(P_cls.shape, P_cls))
-            fout.write('P_regr.shape={}\n P_regr={}\n'.format(P_regr.shape, P_regr))
+        # with open(debug_file, 'a') as fout:
+        #     fout.write('P_cls.shape={}\n P_cls={}\n'.format(P_cls.shape, P_cls))
+        #     fout.write('P_regr.shape={}\n P_regr={}\n'.format(P_regr.shape, P_regr))
 
         for ii in range(P_cls.shape[1]):
             # print(np.max(P_cls[0, ii, :]), np.argmax(P_cls[0, ii, :]) == (P_cls.shape[2] - 1))
@@ -314,8 +336,8 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
                 [C.rpn_stride * x, C.rpn_stride * y, C.rpn_stride * (x + w), C.rpn_stride * (y + h)])
             probs[cls_name].append(np.max(P_cls[0, ii, :]))
 
-    with open(debug_file, 'a') as fout:
-        fout.write('len(bboxes)={}\n bboxes={}\n'.format(len(bboxes), bboxes))
+    # with open(debug_file, 'a') as fout:
+    #     fout.write('len(bboxes)={}\n bboxes={}\n'.format(len(bboxes), bboxes))
 
     all_dets = []
 

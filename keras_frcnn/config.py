@@ -16,14 +16,18 @@ class Config:
 		self.rot_90 = False
 
 		# anchor box scales
-		# self.anchor_box_scales = [128, 256, 512]
-		self.anchor_box_scales = [32, 64, 128, 256, 512]
+		self.anchor_box_scales = [128, 256, 512]
+		self.anchor_box_scales = [64, 96, 128]	# for 32*32 experiment
+		# self.anchor_box_scales = [8, 16, 20, 24, 28, 32]	# for 128*128 experiment
+		# self.anchor_box_scales = [2, 4, 8, 16, 32]
 
 		# anchor box ratios
 		self.anchor_box_ratios = [[1, 1], [1, 2], [2, 1]]
+		# self.anchor_box_ratios = [[1, 1], [1, 1.5], [1, 2], [1.5, 1], [2, 1]]
 
 		# size to resize the smallest side of the image
 		self.im_size = 600
+		# self.im_size = 32
 
 		# image channel-wise mean to subtract
 		self.img_channel_mean = [103.939, 116.779, 123.68]
@@ -34,6 +38,7 @@ class Config:
 
 		# stride at the RPN (this depends on the network configuration)
 		self.rpn_stride = 16
+		# self.rpn_stride = 8	# if only 3 pooling layers
 
 		self.balanced_classes = False
 
