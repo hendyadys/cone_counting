@@ -12,7 +12,7 @@ from keras.layers import Input
 from keras.models import Model
 from keras_frcnn import roi_helpers
 import matplotlib.pyplot as plt
-plt.switch_backend('agg')
+# plt.switch_backend('agg')
 
 sys.setrecursionlimit(40000)
 
@@ -26,12 +26,8 @@ parser.add_option("--config_filename", dest="config_filename", help=
                   default="config.pickle")
 parser.add_option("--network", dest="network", help="Base network to use. Supports vgg or resnet50.",
                   default='resnet50')
-# parser.add_option("--network", dest="network", help="Base network to use. Supports vgg or resnet50.",
-#                   default='vgg')
 parser.add_option("--scale", dest="scale", default='original',
                   help="original anchor box scales or better scales.")
-# parser.add_option("--input_weight_path", dest="input_weight_path",
-#                   help="Input path for trained weights. If not specified, will try to load default weights in config.")
 
 (options, args) = parser.parse_args()
 
@@ -51,14 +47,14 @@ model_path = C.model_path
 #     model_path = model_path
 # else:  # set the path to weights based on backend and model
 #     model_path = '{}{}.hdf5'.format(model_path.split('.hdf5')[0], '' if options.scale=='original' else '_noisy')
-print('model_path:', model_path, 'anchor_box_scales:', C.anchor_box_scales)
+print('config', config_output_filename, 'model_path:', model_path, 'anchor_box_scales:', C.anchor_box_scales,
+      'network:', C.network)
 
 # with open('config.pickle', 'wb') as config_f:
 #     # C.anchor_box_scales = [128, 256, 512]
 #     pickle.dump(C, config_f)
 #     print('Config has been written to {}, and can be loaded when testing to ensure correct results'.format('config.pickle'))
 
-print('C.network=%s' % C.network)
 if C.network == 'resnet50':
     import keras_frcnn.resnet as nn
 elif C.network == 'vgg':
@@ -70,66 +66,6 @@ C.use_vertical_flips = False
 C.rot_90 = False
 
 img_path = options.test_path
-
-
-def plot_cone_preds(file_name, img, coords, flipAxis=False, is_all=False):
-    from matplotlib import pyplot as plt
-    from matplotlib import patches
-    plt.switch_backend('agg')
-
-    fig1, ax1 = plt.subplots(1)
-    ax1.imshow(img)
-    for coord in coords:
-        (x1, y1, x2, y2) = coord
-        if flipAxis:  # imshow flips coords
-            ax1.add_patch(patches.Rectangle((y1, x1), y2 - y1, x2 - x1, fill=False, color='green'))
-        else:
-            ax1.add_patch(patches.Rectangle((x1, y1), x2 - x1, y2 - y1, fill=False, color='green'))
-    pred_path = img_path.split('/')[:-1]
-    pred_path.append('predicted')
-    pred_path = '/'.join(pred_path)
-    img_name = '{}/{}{}.png'.format(pred_path, file_name.split('.png')[0], '_all' if is_all else '')
-    plt.savefig(img_name, bbox_inches='tight')
-
-    # plot points on img
-    plt.figure(2)
-    coord_centers_x = []
-    coord_centers_y = []
-    for coord in coords:
-        (real_x1, real_y1, real_x2, real_y2) = coord
-        coord_centers_x.append((real_x1 + real_x2) / 2.0)
-        coord_centers_y.append((real_y1 + real_y2) / 2.0)
-    plt.imshow(img)
-    if flipAxis:
-        plt.scatter(x=coord_centers_y, y=coord_centers_x, c='blue', s=10)   # imshow flips coords
-    else:
-        plt.scatter(x=coord_centers_x, y=coord_centers_y, c='blue', s=10)
-    img_name = '{}/{}{}_centers.png'.format(pred_path, file_name.split('.png')[0], '_all' if is_all else '')
-    plt.savefig(img_name, bbox_inches='tight')
-    # plt.show()
-    return
-
-
-def calc_euclidean_loss(true_coords, predicted_coords):
-    num_coords_true = len(true_coords)
-    num_preds = len(predicted_coords)
-    euclidean_loss = np.zeros((num_coords_true, num_preds))
-    for i, tc in enumerate(true_coords):
-        for j,pc in enumerate(predicted_coords):
-            temp = (tc[0]-pc[0])**2 + (tc[1]-pc[1])**2
-            euclidean_loss[i,j] = np.sqrt(temp)
-
-    return np.min(euclidean_loss, axis=1), num_coords_true, num_preds
-
-
-def compute_metrics(file_name, img, coords, all_coords):
-    mask_name = '{}_mask.png'.format(file_name.split('.png')[0])
-    mask_data = cv2.imread(mask_name, cv2.IMREAD_GRAYSCALE)
-    mask_coords = np.transpose(np.nonzero(mask_data))
-
-    euclidean_loss, num_coords_true, num_preds = calc_euclidean_loss(mask_coords, coords)
-    euclidean_loss_all, num_coords_true_all, num_preds_all = calc_euclidean_loss(mask_coords, coords)
-    return euclidean_loss, num_coords_true, num_preds, euclidean_loss_all, num_preds_all
 
 
 def format_img_size(img, C):
@@ -237,13 +173,6 @@ all_imgs = []
 classes = {}
 bbox_threshold = 0.8
 
-# visualise = True
-# debug_file = './debug.txt'
-NOISIER = True if options.scale!='original' else False
-all_coords_file = '{}/all_coords{}.txt'.format(img_path, '_noisy' if NOISIER else '')
-coords_file = '{}/coords{}.txt'.format(img_path, '_noisy' if NOISIER else '')
-loss_file = '{}/losses{}.txt'.format(img_path, '_noisy' if NOISIER else '')
-
 for idx, img_name in enumerate(sorted(os.listdir(img_path))):
     # if idx > 0: break
     if 'overview' in img_path and 'mask' in img_name:   # treat mask/truth separately
@@ -251,30 +180,21 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
 
     if not img_name.lower().endswith(('.bmp', '.jpeg', '.jpg', '.png', '.tif', '.tiff')):
         continue
-    print(img_name)
     st = time.time()
     filepath = os.path.join(img_path, img_name)
 
     img = cv2.imread(filepath)
-    print(img.shape)
+    print('img_name', img_name, 'img_shape', img.shape)
 
     X, ratio = format_img(img, C)
-    # with open(debug_file, 'a') as fout:
-    #     fout.write('ratio={} \n X.shape={}\n X={} \n'.format(ratio, X.shape, X))
 
     if K.image_dim_ordering() == 'tf':
         X = np.transpose(X, (0, 2, 3, 1))
 
     # get the feature maps and output from the RPN
     [Y1, Y2, F] = model_rpn.predict(X)
-    # with open(debug_file, 'a') as fout:
-    #     fout.write('Y1.shape={}\n Y1={} \n'.format(Y1.shape, Y1))
-    #     fout.write('Y2.shape={}\n Y2={} \n'.format(Y2.shape, Y2))
-    #     fout.write('F.shape={}\n F={} \n'.format(F.shape, F))
 
     R = roi_helpers.rpn_to_roi(Y1, Y2, C, K.image_dim_ordering(), overlap_thresh=0.7)
-    # with open(debug_file, 'a') as fout:
-    #     fout.write('R.shape={}\n R={} \n'.format(R.shape, R))
 
     # convert from (x1,y1,x2,y2) to (x,y,w,h)
     R[:, 2] -= R[:, 0]
@@ -298,13 +218,7 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
             ROIs_padded[0, curr_shape[1]:, :] = ROIs[0, 0, :]
             ROIs = ROIs_padded
 
-        # with open(debug_file, 'a') as fout:
-        #     fout.write('ROIs.shape={}\n ROIs={} \n'.format(ROIs.shape, ROIs))
-
         [P_cls, P_regr] = model_classifier_only.predict([F, ROIs])
-        # with open(debug_file, 'a') as fout:
-        #     fout.write('P_cls.shape={}\n P_cls={}\n'.format(P_cls.shape, P_cls))
-        #     fout.write('P_regr.shape={}\n P_regr={}\n'.format(P_regr.shape, P_regr))
 
         for ii in range(P_cls.shape[1]):
             # print(np.max(P_cls[0, ii, :]), np.argmax(P_cls[0, ii, :]) == (P_cls.shape[2] - 1))
@@ -336,13 +250,14 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
                 [C.rpn_stride * x, C.rpn_stride * y, C.rpn_stride * (x + w), C.rpn_stride * (y + h)])
             probs[cls_name].append(np.max(P_cls[0, ii, :]))
 
-    # with open(debug_file, 'a') as fout:
-    #     fout.write('len(bboxes)={}\n bboxes={}\n'.format(len(bboxes), bboxes))
-
     all_dets = []
 
     print(len(bboxes))
     for key in bboxes:
+        all_coords_file = '{}/all_coords_{}.txt'.format(img_path, key)
+        coords_file = '{}/coords_{}.txt'.format(img_path, key)
+        loss_file = '{}/losses_{}.txt'.format(img_path, key)
+
         bbox = np.array(bboxes[key])
 
         new_boxes, new_probs = roi_helpers.non_max_suppression_fast(bbox, np.array(probs[key]), overlap_thresh=0.5)
@@ -351,68 +266,40 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
             (x1, y1, x2, y2) = new_boxes[jk, :]
 
             (real_x1, real_y1, real_x2, real_y2) = get_real_coordinates(ratio, x1, y1, x2, y2)
-            supp_coords.append((real_x1, real_y1, real_x2, real_y2))
+            supp_coords.append((real_x1, real_y1, real_x2, real_y2, new_probs[jk]))
 
-            if 'overview' not in img_path:
-                cv2.rectangle(img, (real_x1, real_y1), (real_x2, real_y2),
-                              (int(class_to_color[key][0]), int(class_to_color[key][1]), int(class_to_color[key][2])), 2)
-
-                textLabel = '{}: {}'.format(key, int(100 * new_probs[jk]))
-                all_dets.append((key, 100 * new_probs[jk]))
-
-                (retval, baseLine) = cv2.getTextSize(textLabel, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
-                textOrg = (real_x1, real_y1 - 0)
-
-                cv2.rectangle(img, (textOrg[0] - 5, textOrg[1] + baseLine - 5),
-                              (textOrg[0] + retval[0] + 5, textOrg[1] - retval[1] - 5), (0, 0, 0), 2)
-                cv2.rectangle(img, (textOrg[0] - 5, textOrg[1] + baseLine - 5),
-                              (textOrg[0] + retval[0] + 5, textOrg[1] - retval[1] - 5), (255, 255, 255), -1)
-                cv2.putText(img, textLabel, textOrg, cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 0), 1)
+            # cv2.rectangle(img, (real_x1, real_y1), (real_x2, real_y2),
+            #               (int(class_to_color[key][0]), int(class_to_color[key][1]), int(class_to_color[key][2])), 2)
+            #
+            # textLabel = '{}: {}'.format(key, int(100 * new_probs[jk]))
+            # all_dets.append((key, 100 * new_probs[jk]))
+            #
+            # (retval, baseLine) = cv2.getTextSize(textLabel, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
+            # textOrg = (real_x1, real_y1 - 0)
+            #
+            # cv2.rectangle(img, (textOrg[0] - 5, textOrg[1] + baseLine - 5),
+            #               (textOrg[0] + retval[0] + 5, textOrg[1] - retval[1] - 5), (0, 0, 0), 2)
+            # cv2.rectangle(img, (textOrg[0] - 5, textOrg[1] + baseLine - 5),
+            #               (textOrg[0] + retval[0] + 5, textOrg[1] - retval[1] - 5), (255, 255, 255), -1)
+            # cv2.putText(img, textLabel, textOrg, cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 0), 1)
 
         # store all coords
         all_coords = []
         for i in range(len(bbox)):
             x1, y1, x2, y2 = bbox[i, :]
-            all_coords.append(get_real_coordinates(ratio, x1, y1, x2, y2))
+            (all_x1, all_y1, all_x2, all_y2) = get_real_coordinates(ratio, x1, y1, x2, y2)
+            all_coords.append((all_x1, all_y1, all_x2, all_y2, probs[key][i]))
 
-        if 'overview' in img_path:
-            # visualize all_coords and thresholded coords
-            plot_cone_preds(img_name, img, supp_coords, flipAxis=False, is_all=False)
-            # plot_cone_preds(img_name, img, all_coords, flipAxis=False, is_all=True)
-            euclidean_loss, num_coords_true, num_preds, euclidean_loss_all, num_preds_all = \
-                compute_metrics('%s/%s' % (img_path, img_name), img, supp_coords, all_coords)
-
+        if 'overview' in img_path or 'pepple' in img_path:
             with open(coords_file, 'a') as fout:
                 fout.write('{}\t{}\n'.format(img_name, supp_coords))
             with open(all_coords_file, 'a') as fout:
                 fout.write('{}\t{}\n'.format(img_name, all_coords))
-            with open(loss_file, 'a') as fout:
-                fout.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(img_name, num_coords_true, num_preds,
-                                                             np.sum(euclidean_loss)/float(num_coords_true),
-                                                             num_preds_all, np.sum(euclidean_loss_all)/float(num_coords_true)))
-        if 'pepple' in img_path:
-            # visualize all_coords and thresholded coords
-            # plot_cone_preds(img_name, img, supp_coords, flipAxis=False, is_all=False)
-            with open(coords_file, 'a') as fout:
-                fout.write('{}\t{}\n'.format(img_name, supp_coords))
-            with open(all_coords_file, 'a') as fout:
-                fout.write('{}\t{}\n'.format(img_name, all_coords))
-            # plt.imshow(img)
-            # plt.savefig('./results_imgs2/{}.png'.format(img_name), bbox_inches='tight')
-            # cv2.waitKey(0)
-            # cv2.imwrite('./results_imgs2/{}.png'.format(img_name), img)
-
 
     print('Elapsed time = {}'.format(time.time() - st))
     print(all_dets)
-    # cv2.imshow('img', img)
-    # cv2.waitKey(0)
-    # cv2.imwrite('./results_imgs/{}.png'.format(idx),img)
 
 
 # command line arguments
 #  "-p" "../overview/1-process-data/final/valid" "--network" "vgg"
-# "-p" "../overview/1-process-data/testImages" "--network" "vgg"
-# "-p" "../VOCdevkit/VOC2012/JPEGImages" "--network" "vgg"
 # "-o" "simple" "-p" "../overview/1-process-data/cone_data_valid.txt" "--network" "vgg"
-# "-p" "../VOCdevkit" "--network" "vgg"
