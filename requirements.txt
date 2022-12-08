@@ -1,5 +1,5 @@
 biopython==1.68
-certifi==2017.7.27.1
+certifi==2022.12.7
 chardet==3.0.4
 cycler==0.10.0
 decorator==4.1.2
